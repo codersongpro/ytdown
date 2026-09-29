@@ -5,6 +5,11 @@ on:
     branches: ["**"]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "릴리즈 태그 (예: v1.0.0). 비우면 빌드만 합니다."
+        required: false
+        default: ""
   schedule:
     # 매주 월요일: 최신 yt-dlp로 다시 빌드 (유튜브 사양 변경 대응)
     - cron: "0 0 * * 1"
@@ -50,7 +55,19 @@ jobs:
           path: ${{ matrix.binary }}
 
       - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: ytdown ${{ inputs.release_tag || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           files: ${{ matrix.binary }}
+          body: |
+            ## 다운로드
+            - **Windows**: `ytdown.exe` 받아서 더블클릭
+            - **macOS**: `ytdown` 받은 뒤 터미널에서 `chmod +x ytdown && ./ytdown`
+
+            실행하면 검은 창과 함께 브라우저가 열립니다. 종료는 검은 창을 닫으세요.
+            처음 실행 시 Windows "PC 보호" 경고가 나오면 **추가 정보 → 실행**을 누르세요.
+
+            ⚠️ 본인 영상, CC 라이선스, 이용 허락을 받은 자료만 받으세요.

@@ -15,7 +15,7 @@
 1. GitHub 저장소 → **Actions** → 최신 **Build executables** 실행 → 아래 **Artifacts**에서 받기
    - Windows: `ytdown-windows` → 압축 풀고 `ytdown.exe` 더블클릭
    - macOS: `ytdown-macos` → 압축 풀기 → 터미널에서 `chmod +x ytdown` 후 실행
-   - `v1.0` 같은 태그를 올리면 **Releases**에도 자동으로 첨부됩니다.
+   - 정식 배포본은 **Releases** 페이지에 있습니다. (Actions → Build executables → Run workflow에 `v1.0.1` 같은 태그를 넣으면 새 릴리즈 생성)
 2. 검은 창이 뜨고 브라우저가 자동으로 열립니다. **종료는 검은 창을 닫으면 됩니다.**
 
 처음 실행 시 경고가 나올 수 있습니다(코드 서명이 없는 개인 프로그램이라 정상).
