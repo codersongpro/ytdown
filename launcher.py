@@ -58,6 +58,28 @@ class Api:
         return result[0] if result else None
 
 
+def selftest(url: str) -> None:
+    """빌드된 실행파일이 제대로 묶였는지 확인 (CI용). 실패 시 종료 코드 1."""
+    import json
+    import urllib.request
+
+    import imageio_ffmpeg
+    import truststore  # noqa: F401
+
+    with urllib.request.urlopen(f"{url}/api/settings", timeout=10) as r:
+        assert "save_dir" in json.load(r)
+    with urllib.request.urlopen(url, timeout=10) as r:
+        assert b"ytdown" in r.read()
+    assert Path(imageio_ffmpeg.get_ffmpeg_exe()).is_file()
+    if sys.platform == "win32":
+        from webview.platforms import winforms  # noqa: F401  (pythonnet + WebView2 DLL)
+    elif sys.platform == "darwin":
+        from webview.platforms import cocoa  # noqa: F401
+    print("SELFTEST OK")
+    sys.stdout.flush()
+    os._exit(0)
+
+
 def main() -> None:
     shutil.rmtree(DOWNLOAD_DIR, ignore_errors=True)  # 이전 실행에서 남은 임시 파일 정리
 
@@ -66,6 +88,10 @@ def main() -> None:
     server = uvicorn.Server(uvicorn.Config(app, host=HOST, port=port, log_level="warning"))
     threading.Thread(target=server.run, daemon=True).start()
     wait_until_ready(port)
+
+    if "--selftest" in sys.argv:
+        selftest(url)
+        return
 
     if "--browser" in sys.argv:
         import webbrowser
@@ -90,4 +116,8 @@ if __name__ == "__main__":
         LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(traceback.format_exc())
+        if "--selftest" in sys.argv:
+            print(traceback.format_exc())
+            sys.stdout.flush()
+            os._exit(1)
         raise

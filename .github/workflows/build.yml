@@ -48,6 +48,18 @@ jobs:
       - name: Build
         run: pyinstaller --noconfirm --clean ytdown.spec
 
+      - name: Smoke test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist/ytdown.exe -ArgumentList '--selftest' -Wait -PassThru
+          Get-Content "$HOME/.ytdown/ytdown.log" -ErrorAction SilentlyContinue
+          if ($p.ExitCode -ne 0) { exit 1 }
+
+      - name: Smoke test (macOS)
+        if: runner.os == 'macOS'
+        run: dist/ytdown.app/Contents/MacOS/ytdown --selftest
+
       - name: Zip macOS app
         if: runner.os == 'macOS'
         run: ditto -c -k --keepParent dist/ytdown.app dist/ytdown-macos.zip
