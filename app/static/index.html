@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ytdown</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #fff; --text: #1d2330; --muted: #677084;
+    --line: #e2e5eb; --accent: #e5322d; --accent-text: #fff; --err: #c62828;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161b; --card: #1d2027; --text: #e8eaef; --muted: #9aa1b1;
+            --line: #2f333d; --err: #ff7b72; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .row { display: flex; gap: 8px; }
+  input[type=url] { flex: 1; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 8px;
+                    background: var(--bg); color: var(--text); font-size: 1rem; }
+  button { padding: 12px 18px; border: 0; border-radius: 8px; background: var(--accent); color: var(--accent-text);
+           font-size: 1rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
+  button:disabled { opacity: .5; cursor: default; }
+  .preview { display: flex; gap: 14px; align-items: flex-start; }
+  .preview img { width: 160px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--line); }
+  .preview .title { font-weight: 600; margin: 0 0 4px; }
+  .meta { color: var(--muted); font-size: .9rem; }
+  fieldset { border: 0; padding: 0; margin: 16px 0 0; }
+  legend { font-weight: 600; margin-bottom: 8px; }
+  .choices { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choices label { border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+  .choices input { margin-right: 6px; }
+  .choices label:has(input:checked) { border-color: var(--accent); }
+  .bar { height: 10px; background: var(--line); border-radius: 5px; overflow: hidden; margin: 12px 0 6px; }
+  .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
+  .msg { min-height: 1.5em; margin: 8px 0 0; }
+  .msg.error { color: var(--err); }
+  .notice { color: var(--muted); font-size: .85rem; }
+  [hidden] { display: none !important; }
+  @media (max-width: 480px) {
+    .row { flex-direction: column; }
+    .preview { flex-direction: column; }
+    .preview img { width: 100%; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>ytdown</h1>
+  <p class="sub">유튜브 주소를 넣고 MP4(영상) 또는 MP3(음원)로 저장하세요.</p>
+
+  <section class="card">
+    <form id="infoForm" class="row">
+      <input id="url" type="url" required placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+      <button id="infoBtn" type="submit">정보 확인</button>
+    </form>
+    <p id="infoMsg" class="msg"></p>
+  </section>
+
+  <section id="optionCard" class="card" hidden>
+    <div class="preview">
+      <img id="thumb" alt="">
+      <div>
+        <p id="title" class="title"></p>
+        <p id="meta" class="meta"></p>
+      </div>
+    </div>
+
+    <fieldset>
+      <legend>형식</legend>
+      <div class="choices">
+        <label><input type="radio" name="format" value="mp4" checked>MP4 영상</label>
+        <label><input type="radio" name="format" value="mp3">MP3 음원</label>
+      </div>
+    </fieldset>
+
+    <fieldset id="videoQ">
+      <legend>화질</legend>
+      <div class="choices">
+        <label><input type="radio" name="vq" value="best">최고</label>
+        <label><input type="radio" name="vq" value="1080">1080p</label>
+        <label><input type="radio" name="vq" value="720" checked>720p</label>
+        <label><input type="radio" name="vq" value="480">480p</label>
+      </div>
+    </fieldset>
+
+    <fieldset id="audioQ" hidden>
+      <legend>음질</legend>
+      <div class="choices">
+        <label><input type="radio" name="aq" value="320">320kbps</label>
+        <label><input type="radio" name="aq" value="192" checked>192kbps</label>
+        <label><input type="radio" name="aq" value="128">128kbps</label>
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <button id="dlBtn" type="button">다운로드</button>
+      <div id="progressWrap" hidden>
+        <div class="bar"><div id="bar"></div></div>
+        <span id="progressText" class="meta"></span>
+      </div>
+      <p id="dlMsg" class="msg"></p>
+    </fieldset>
+  </section>
+
+  <p class="notice">본인이 만든 영상, CC 라이선스 영상, 이용 허락을 받은 자료만 받으세요.
+  유튜브 약관과 저작권법상 무단 다운로드·재배포는 금지되어 있습니다.</p>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let currentUrl = "";
+
+function setMsg(el, text, isError = false) {
+  el.textContent = text;
+  el.classList.toggle("error", isError);
+}
+
+function fmtDuration(sec) {
+  sec = Math.round(sec || 0);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+}
+
+async function postJson(path, body) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || "요청에 실패했습니다.");
+  return data;
+}
+
+$("infoForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const url = $("url").value.trim();
+  $("infoBtn").disabled = true;
+  $("optionCard").hidden = true;
+  setMsg($("infoMsg"), "영상 정보를 확인하는 중…");
+  try {
+    const info = await postJson("/api/info", { url });
+    currentUrl = url;
+    $("thumb").hidden = !info.thumbnail;
+    $("thumb").src = info.thumbnail || "";
+    $("title").textContent = info.title;
+    $("meta").textContent = `${info.channel} · ${fmtDuration(info.duration)}`;
+    $("optionCard").hidden = false;
+    $("progressWrap").hidden = true;
+    setMsg($("dlMsg"), "");
+    setMsg($("infoMsg"), "");
+  } catch (err) {
+    setMsg($("infoMsg"), err.message, true);
+  } finally {
+    $("infoBtn").disabled = false;
+  }
+});
+
+document.querySelectorAll('input[name="format"]').forEach((r) =>
+  r.addEventListener("change", () => {
+    const isMp3 = document.querySelector('input[name="format"]:checked').value === "mp3";
+    $("videoQ").hidden = isMp3;
+    $("audioQ").hidden = !isMp3;
+  })
+);
+
+function setProgress(pct, text) {
+  $("bar").style.width = `${pct}%`;
+  $("progressText").textContent = text;
+}
+
+$("dlBtn").addEventListener("click", async () => {
+  const format = document.querySelector('input[name="format"]:checked').value;
+  const quality = document.querySelector(`input[name="${format === "mp3" ? "aq" : "vq"}"]:checked`).value;
+  $("dlBtn").disabled = true;
+  $("progressWrap").hidden = false;
+  setProgress(0, "준비 중…");
+  setMsg($("dlMsg"), "");
+  try {
+    const { job_id } = await postJson("/api/download", { url: currentUrl, format, quality });
+    while (true) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const res = await fetch(`/api/progress/${job_id}`);
+      const job = await res.json();
+      if (!res.ok) throw new Error(job.detail || "작업 상태를 확인할 수 없습니다.");
+      if (job.status === "error") throw new Error(job.error);
+      if (job.status === "queued") setProgress(0, "대기 중…");
+      else if (job.status === "downloading") setProgress(job.progress, `다운로드 중 ${job.progress}%`);
+      else if (job.status === "processing") setProgress(100, format === "mp3" ? "MP3로 변환 중…" : "영상 합치는 중…");
+      else if (job.status === "done") {
+        setProgress(100, "완료!");
+        window.location.href = `/api/file/${job_id}`;
+        setMsg($("dlMsg"), `저장을 시작했습니다: ${job.filename}`);
+        break;
+      }
+    }
+  } catch (err) {
+    setMsg($("dlMsg"), err.message, true);
+    $("progressWrap").hidden = true;
+  } finally {
+    $("dlBtn").disabled = false;
+  }
+});
+</script>
+</body>
+</html>
