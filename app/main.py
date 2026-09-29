@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 import threading
 import time
 import uuid
@@ -17,7 +18,8 @@ from . import downloader
 from .downloader import DownloaderError
 
 BASE_DIR = Path(__file__).resolve().parent
-DOWNLOAD_DIR = BASE_DIR.parent / "downloads"
+# 실행파일(exe)로 묶였을 때도 쓸 수 있도록 OS 임시 폴더 사용
+DOWNLOAD_DIR = Path(tempfile.gettempdir()) / "ytdown"
 MAX_CONCURRENT = 2
 JOB_TTL_SEC = 60 * 60
 
