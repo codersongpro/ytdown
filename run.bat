@@ -10,7 +10,7 @@ call .venv\Scripts\activate.bat
 echo 필요한 프로그램 설치/업데이트 중...
 python -m pip install -q -U pip
 python -m pip install -q -U -r requirements.txt
-start "" http://127.0.0.1:8000
-echo 브라우저에서 http://127.0.0.1:8000 을 여세요. 종료: 이 창을 닫거나 Ctrl+C
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+
+echo ytdown 창이 열립니다.
+python launcher.py
 pause

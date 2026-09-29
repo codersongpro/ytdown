@@ -6,6 +6,7 @@ from app.downloader import (
     extract_video_id,
     friendly_error,
     safe_filename,
+    unique_path,
 )
 
 VID = "dQw4w9WgXcQ"
@@ -80,3 +81,25 @@ def test_friendly_error_messages():
     assert "비공개" in friendly_error(Exception("ERROR: Private video"))
     assert "삭제" in friendly_error(Exception("Video unavailable"))
     assert "막았" in friendly_error(Exception("Sign in to confirm you're not a bot"))
+
+
+def test_friendly_error_certificate():
+    err = Exception(
+        "ERROR: [youtube] 393-FVtpLPc: Unable to download API page: [SSL: CERTIFICATE_VERIFY_FAILED] "
+        "certificate verify failed: self-signed certificate in certificate chain"
+    )
+    assert "인증서" in friendly_error(err)
+
+
+def test_friendly_error_unknown_shows_detail():
+    msg = friendly_error(Exception("ERROR: something odd happened; please report this issue on https://x"))
+    assert "something odd happened" in msg
+    assert "please report" not in msg
+
+
+def test_unique_path(tmp_path):
+    assert unique_path(tmp_path, "a.mp3") == tmp_path / "a.mp3"
+    (tmp_path / "a.mp3").touch()
+    assert unique_path(tmp_path, "a.mp3") == tmp_path / "a (1).mp3"
+    (tmp_path / "a (1).mp3").touch()
+    assert unique_path(tmp_path, "a.mp3") == tmp_path / "a (2).mp3"

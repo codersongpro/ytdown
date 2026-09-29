@@ -40,7 +40,11 @@
   .bar > div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
   .msg { min-height: 1.5em; margin: 8px 0 0; }
   .msg.error { color: var(--err); }
-  .notice { color: var(--muted); font-size: .85rem; }
+  button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); padding: 8px 14px; font-weight: 500; }
+  .save { padding: 14px 20px; }
+  .save-row { display: flex; gap: 8px; align-items: center; }
+  .save-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .path { font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   [hidden] { display: none !important; }
   @media (max-width: 480px) {
     .row { flex-direction: column; }
@@ -60,6 +64,17 @@
       <button id="infoBtn" type="submit">정보 확인</button>
     </form>
     <p id="infoMsg" class="msg"></p>
+  </section>
+
+  <section class="card save">
+    <div class="save-row">
+      <div class="save-info">
+        <span class="meta">저장 위치</span>
+        <span id="saveDir" class="path"></span>
+      </div>
+      <button id="changeDirBtn" type="button" class="ghost" hidden>변경</button>
+      <button id="openDirBtn" type="button" class="ghost">열기</button>
+    </div>
   </section>
 
   <section id="optionCard" class="card" hidden>
@@ -105,16 +120,36 @@
         <span id="progressText" class="meta"></span>
       </div>
       <p id="dlMsg" class="msg"></p>
+      <button id="showFileBtn" type="button" class="ghost" hidden>저장된 파일 보기</button>
     </fieldset>
   </section>
 
-  <p class="notice">본인이 만든 영상, CC 라이선스 영상, 이용 허락을 받은 자료만 받으세요.
-  유튜브 약관과 저작권법상 무단 다운로드·재배포는 금지되어 있습니다.</p>
 </main>
 
 <script>
 const $ = (id) => document.getElementById(id);
 let currentUrl = "";
+let lastJobId = null;
+
+async function loadSettings() {
+  const res = await fetch("/api/settings");
+  if (res.ok) $("saveDir").textContent = (await res.json()).save_dir;
+}
+
+// 데스크톱 창(pywebview) 안에서만 폴더 선택 창을 쓸 수 있다
+window.addEventListener("pywebviewready", () => { $("changeDirBtn").hidden = false; });
+if (window.pywebview) $("changeDirBtn").hidden = false;
+
+$("changeDirBtn").addEventListener("click", async () => {
+  const dir = await window.pywebview.api.choose_folder();
+  if (!dir) return;
+  try {
+    const data = await postJson("/api/settings", { save_dir: dir });
+    $("saveDir").textContent = data.save_dir;
+  } catch (err) { alert(err.message); }
+});
+$("openDirBtn").addEventListener("click", () => postJson("/api/open", {}).catch((e) => alert(e.message)));
+$("showFileBtn").addEventListener("click", () => postJson("/api/open", { job_id: lastJobId }).catch((e) => alert(e.message)));
 
 function setMsg(el, text, isError = false) {
   el.textContent = text;
@@ -180,6 +215,7 @@ $("dlBtn").addEventListener("click", async () => {
   const format = document.querySelector('input[name="format"]:checked').value;
   const quality = document.querySelector(`input[name="${format === "mp3" ? "aq" : "vq"}"]:checked`).value;
   $("dlBtn").disabled = true;
+  $("showFileBtn").hidden = true;
   $("progressWrap").hidden = false;
   setProgress(0, "준비 중…");
   setMsg($("dlMsg"), "");
@@ -196,8 +232,9 @@ $("dlBtn").addEventListener("click", async () => {
       else if (job.status === "processing") setProgress(100, format === "mp3" ? "MP3로 변환 중…" : "영상 합치는 중…");
       else if (job.status === "done") {
         setProgress(100, "완료!");
-        window.location.href = `/api/file/${job_id}`;
-        setMsg($("dlMsg"), `저장을 시작했습니다: ${job.filename}`);
+        setMsg($("dlMsg"), `저장했습니다: ${job.filename}`);
+        lastJobId = job_id;
+        $("showFileBtn").hidden = false;
         break;
       }
     }
@@ -208,6 +245,7 @@ $("dlBtn").addEventListener("click", async () => {
     $("dlBtn").disabled = false;
   }
 });
+loadSettings();
 </script>
 </body>
 </html>

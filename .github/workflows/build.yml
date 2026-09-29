@@ -28,7 +28,7 @@ jobs:
             binary: dist/ytdown.exe
           - os: macos-latest
             artifact: ytdown-macos
-            binary: dist/ytdown
+            binary: dist/ytdown-macos.zip
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +48,10 @@ jobs:
       - name: Build
         run: pyinstaller --noconfirm --clean ytdown.spec
 
+      - name: Zip macOS app
+        if: runner.os == 'macOS'
+        run: ditto -c -k --keepParent dist/ytdown.app dist/ytdown-macos.zip
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -65,9 +69,7 @@ jobs:
           body: |
             ## 다운로드
             - **Windows**: `ytdown.exe` 받아서 더블클릭
-            - **macOS**: `ytdown` 받은 뒤 터미널에서 `chmod +x ytdown && ./ytdown`
+            - **macOS**: `ytdown-macos.zip` 압축 풀고 `ytdown.app`을 우클릭 → 열기
 
-            실행하면 검은 창과 함께 브라우저가 열립니다. 종료는 검은 창을 닫으세요.
+            실행하면 ytdown 프로그램 창이 열리고, 파일은 기본으로 `다운로드` 폴더에 저장됩니다.
             처음 실행 시 Windows "PC 보호" 경고가 나오면 **추가 정보 → 실행**을 누르세요.
-
-            ⚠️ 본인 영상, CC 라이선스, 이용 허락을 받은 자료만 받으세요.

@@ -7,6 +7,15 @@ from pathlib import Path
 from typing import Callable
 from urllib.parse import parse_qs, urlparse
 
+try:
+    # 운영체제(Windows/macOS)에 등록된 인증서를 사용한다.
+    # 학교·회사망 보안 장비나 백신이 HTTPS를 검사하는 환경에서도 연결되게 하기 위함.
+    import truststore
+
+    truststore.inject_into_ssl()
+except Exception:  # noqa: BLE001
+    pass
+
 import imageio_ffmpeg
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError
@@ -103,20 +112,40 @@ def build_opts(fmt: str, quality: str, out_dir: Path) -> dict:
 
 
 def friendly_error(err: Exception) -> str:
-    msg = str(err).lower()
+    raw = str(err)
+    msg = raw.lower()
+    if "certificate" in msg or "ssl" in msg:
+        return (
+            "보안 인증서 오류입니다. 학교·회사 네트워크나 백신의 보안 검사 때문일 수 있습니다. "
+            "다른 네트워크(휴대폰 핫스팟 등)에서 시도해 보세요."
+        )
     if "private" in msg:
         return "비공개 영상이라 받을 수 없습니다."
     if "sign in to confirm your age" in msg or ("age" in msg and "restrict" in msg):
         return "연령 제한 영상이라 받을 수 없습니다."
     if "not a bot" in msg or "sign in" in msg:
-        return "유튜브가 요청을 일시적으로 막았습니다. 잠시 후 다시 시도하거나 yt-dlp를 업데이트해 주세요."
+        return "유튜브가 요청을 일시적으로 막았습니다. 잠시 후 다시 시도해 주세요."
     if "unavailable" in msg or "removed" in msg or "does not exist" in msg:
         return "삭제되었거나 볼 수 없는 영상입니다."
     if "live" in msg and ("event" in msg or "stream" in msg):
         return "진행 중인 라이브 방송은 받을 수 없습니다."
     if "network" in msg or "timed out" in msg or "connection" in msg:
         return "네트워크 오류입니다. 인터넷 연결을 확인해 주세요."
-    return "처리 중 오류가 발생했습니다. yt-dlp 업데이트 후 다시 시도해 주세요."
+    # 분류되지 않은 오류는 원인 파악을 위해 원문을 함께 보여 준다
+    detail = re.sub(r"^error:\s*", "", raw.strip().splitlines()[0] if raw.strip() else "", flags=re.I)
+    detail = detail.split("; please report this issue")[0][:300]
+    return f"처리 중 오류가 발생했습니다. ({detail})" if detail else "처리 중 오류가 발생했습니다."
+
+
+def unique_path(folder: Path, filename: str) -> Path:
+    """같은 이름이 있으면 '이름 (1).mp4'처럼 번호를 붙인다."""
+    target = folder / filename
+    stem, suffix = target.stem, target.suffix
+    n = 1
+    while target.exists():
+        target = folder / f"{stem} ({n}){suffix}"
+        n += 1
+    return target
 
 
 def fetch_info(url: str) -> dict:
